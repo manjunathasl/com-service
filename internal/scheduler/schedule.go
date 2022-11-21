@@ -41,7 +41,8 @@ func (s *Scheduler) Start() {
 
 	wg.Add(1)
 	go func() {
-		log.Println("Started scheduler process communications")
+		fmt.Println("")
+		log.Println("scheduler started...!")
 		done := make(chan struct{})
 		s.getEventsToProcess(time.Now(), done)
 		for {
@@ -50,8 +51,10 @@ func (s *Scheduler) Start() {
 				s.getEventsToProcess(time.Now(), done)
 			case <-done:
 				ticker.Stop()
+				fmt.Println("")
+				fmt.Println("      Done with sending notifications        ")
 				for _, c := range s.Customers {
-					log.Printf("%s %t\n", c.Email, c.Closed)
+					log.Printf("%s Done: %t\n", c.Email, c.Closed)
 				}
 
 				wg.Done()
@@ -64,6 +67,10 @@ func (s *Scheduler) Start() {
 
 func (s *Scheduler) postMessage(message Message) (ComResponse, error) {
 	var comResp ComResponse
+
+	client := http.Client{
+		Timeout: 10 * time.Second,
+	}
 	jsonMessage, err := json.Marshal(message)
 
 	if err != nil {
@@ -71,7 +78,7 @@ func (s *Scheduler) postMessage(message Message) (ComResponse, error) {
 	}
 
 	reqBody := bytes.NewBuffer(jsonMessage)
-	res, err := http.Post(s.ComURL, "application/json", reqBody)
+	res, err := client.Post(s.ComURL, "application/json", reqBody)
 	if err != nil {
 		return comResp, fmt.Errorf("error in com service invoke %v", err)
 	}
@@ -95,31 +102,7 @@ func (s *Scheduler) getEventsToProcess(now time.Time, done chan struct{}) {
 			eventConter := 0
 			for _, e := range c.Events {
 				if !c.IsProcessing() && e.NotifiedAt.IsZero() && (e.When.Before(now) || e.When == now) {
-
-					go func(c *models.CustomerEvent, e *models.Event) {
-						if c.IsProcessing() {
-							return
-						}
-						c.Start()
-						log.Printf("notifying User: %s", c.Email)
-
-						data, err := s.postMessage(Message{
-							Email: c.Email,
-							Text:  c.Message,
-						})
-
-						if err != nil {
-							log.Printf("unable to communicate com service %s \n", c.Email)
-							return
-						}
-
-						if data.Paid {
-							c.Done()
-						}
-						e.NotifiedAt = time.Now()
-						c.Stop()
-						log.Printf("notified '%s' at %s paid: %t\n", data.Email, e.NotifiedAt.Format(time.ANSIC), data.Paid)
-					}(c, e)
+					go s.checkAndCommunicate(c, e, done)
 				} else if !e.NotifiedAt.IsZero() {
 					eventConter += 1
 				}
@@ -136,4 +119,31 @@ func (s *Scheduler) getEventsToProcess(now time.Time, done chan struct{}) {
 	if closedSchedulesCount == len(s.Customers) {
 		close(done)
 	}
+}
+
+func (s *Scheduler) checkAndCommunicate(c *models.CustomerEvent, e *models.Event, done chan struct{}) {
+	if c.IsProcessing() {
+		return
+	}
+
+	c.Start()
+	log.Printf("notifying User: %s", c.Email)
+
+	data, err := s.postMessage(Message{
+		Email: c.Email,
+		Text:  c.Message,
+	})
+
+	if err != nil {
+		log.Printf("unable to communicate com service %s \n", c.Email)
+		close(done)
+		return
+	}
+
+	if data.Paid {
+		c.Done()
+	}
+	e.NotifiedAt = time.Now()
+	c.Stop()
+	log.Printf("notified '%s' at %s paid: %t\n", data.Email, e.NotifiedAt.Format(time.ANSIC), data.Paid)
 }

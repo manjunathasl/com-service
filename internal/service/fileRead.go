@@ -3,6 +3,7 @@ package service
 import (
 	"com-service/internal/models"
 	"encoding/csv"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -12,7 +13,7 @@ import (
 
 // Read data from csv file given
 func ReadCSVFile(filePath string) models.CustomerSchedules {
-
+	log.Printf("stated reading file %s\n", filePath)
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Fatal("unable to locate the file: "+filePath, err)
@@ -33,12 +34,17 @@ func ReadCSVFile(filePath string) models.CustomerSchedules {
 		customerList[i] = models.Customer{Email: r[0], Text: r[1], Schedule: r[2]}
 	}
 
+	log.Println("done with reading file....!")
+	log.Printf("%v\n", customerList)
+
 	return models.CustomerSchedules{
 		List: customerList,
 	}
 }
 
 func ComposeSchedules(cutomerSchedules models.CustomerSchedules) []*models.CustomerEvent {
+	fmt.Println("")
+	log.Println("started marking schedules")
 	customerEvents := make([]*models.CustomerEvent, len(cutomerSchedules.List))
 	for i, c := range cutomerSchedules.List {
 		events := getEvents(c.Schedule)
@@ -49,6 +55,7 @@ func ComposeSchedules(cutomerSchedules models.CustomerSchedules) []*models.Custo
 			Events:  events,
 		}
 	}
+	log.Println("done with scheduling...!")
 
 	return customerEvents
 }
@@ -64,7 +71,7 @@ func getEvents(schedulePatter string) []*models.Event {
 	for i, s := range slots {
 		delay, unit := parseTimePattern(s)
 		when := time.Now()
-		//log.Printf("s: %s \n", when.Format(time.ANSIC))
+
 		switch strings.ToLower(unit) {
 		case "s":
 			when = when.Add(time.Second * time.Duration(delay))
@@ -73,6 +80,7 @@ func getEvents(schedulePatter string) []*models.Event {
 		case "h":
 			when = when.Add(time.Hour * time.Duration(delay))
 		}
+
 		events[i] = &models.Event{
 			When: when,
 		}
