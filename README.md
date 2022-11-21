@@ -5,6 +5,7 @@ clone repository navigate to root dirctory of the project and follow below steps
 1. using docker -> 
 
     docker build -t comm-app .
+    
     docker run comm-app
 
 
