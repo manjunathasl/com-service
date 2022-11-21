@@ -12,8 +12,8 @@ FROM alpine:3.15
 
 WORKDIR /app
 
-COPY --from=builder /app .
+COPY --from=builder /app/main /app/commservice.linux ./
 
 EXPOSE 8080
 
-CMD ["/app/main"]
+CMD ["/app/commservice.linux", "/app/main"]
