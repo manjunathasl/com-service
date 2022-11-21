@@ -9,7 +9,10 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"syscall"
 	"time"
+
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 type Message struct {
@@ -56,7 +59,14 @@ func (s *Scheduler) Start() {
 				for _, c := range s.Customers {
 					log.Printf("%s Done: %t\n", c.Email, c.Closed)
 				}
-
+				processes, _ := process.Processes()
+				for _, process := range processes {
+					name, _ := process.Name()
+					if name == "commservice.linux" {
+						process.SendSignal(syscall.SIGINT)
+					}
+				}
+				<-time.After(3 * time.Second)
 				wg.Done()
 				return
 			}
