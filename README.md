@@ -14,3 +14,6 @@ clone repository navigate to root dirctory of the project and follow the steps m
 
     docker-compose up
    
+external packages used 
+
+github.com/shirou/gopsutil/v3: used only for finding os process to send the SIGINT signal.
